@@ -10,16 +10,16 @@ public class Blog
     [Key]
     public int Id { get; set; }
     [Required]
-    public string? Title { get; set; }
+    public required string Title { get; set; }
     [Required]
-    public string? Text { get; set; }
+    public required string Text { get; set; }
     [ForeignKey("TopicId"), Required]
-    public int TopicId { get; set; }
+    public required int TopicId { get; set; }
     public Topic? Topic { get; set; }
     [ForeignKey("UserId"), Required]
-    public int UserId { get; set; }
+    public required int UserId { get; set; }
     public User? User { get; set; }
     public string? PictureUrl { get; set; } 
     [Required]
-    public DateTime? CreationDate{set; get;}
+    public required DateTime CreationDate{set; get;}
 }
