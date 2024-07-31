@@ -2,7 +2,7 @@ namespace BlogBackend.Infrastructure.Blog.Commands;
 
 using MediatR;
 
-public class CreateCommand : IRequest
+public class CreateBlogCommand : IRequest
 {
     public string? Title { get; set; }
     public string? Text { get; set; }

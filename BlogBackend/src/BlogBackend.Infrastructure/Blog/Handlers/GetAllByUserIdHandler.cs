@@ -5,7 +5,7 @@ using BlogBackend.Core.Blog.Models;
 using BlogBackend.Core.Blog.Repositories.Base;
 using BlogBackend.Infrastructure.Blog.Queries;
 
-public class GetAllByUserIdHandler : IRequestHandler<GetAllByUserIdQuery, IEnumerable<Blog?>>
+public class GetAllByUserIdHandler : IRequestHandler<GetAllBlogsByUserIdQuery, IEnumerable<Blog?>>
 {
     private readonly IBlogRepository repository;
     public GetAllByUserIdHandler(IBlogRepository repository)
@@ -13,7 +13,7 @@ public class GetAllByUserIdHandler : IRequestHandler<GetAllByUserIdQuery, IEnume
         this.repository = repository;
     }
 
-    public async Task<IEnumerable<Blog?>> Handle(GetAllByUserIdQuery request, CancellationToken cancellationToken)
+    public async Task<IEnumerable<Blog?>> Handle(GetAllBlogsByUserIdQuery request, CancellationToken cancellationToken)
     {
         if(request.UserId is null || request.UserId <= 0) {
             throw new ArgumentException("userId is incorrect");

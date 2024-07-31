@@ -7,14 +7,14 @@ using System.Threading;
 using BlogBackend.Core.UserTopic.Repositories.Base;
 using BlogBackend.Core.UserTopic.Models;
 
-public class CreateHandler : IRequestHandler<CreateCommand>
+public class CreateHandler : IRequestHandler<CreateUserTopicCommand>
 {
     private readonly IUserTopicRepository repository;
     public CreateHandler(IUserTopicRepository repository)
     {
         this.repository = repository;
     }
-    public async Task Handle(CreateCommand request, CancellationToken cancellationToken)
+    public async Task Handle(CreateUserTopicCommand request, CancellationToken cancellationToken)
     {
         if(request.TopicId <= 0) {
             throw new ArgumentException("topicId is incorrect");

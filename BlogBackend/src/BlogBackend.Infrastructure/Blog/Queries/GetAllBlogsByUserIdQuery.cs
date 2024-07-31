@@ -3,8 +3,7 @@ namespace BlogBackend.Infrastructure.Blog.Queries;
 using MediatR;
 using BlogBackend.Core.Blog.Models;
 
-public class GetByIdQuery : IRequest<Blog?>
+public class GetAllBlogsByUserIdQuery : IRequest<IEnumerable<Blog?>>
 {
-    public int? Id { get; set; }
+    public int? UserId { get; set; }
 }
-

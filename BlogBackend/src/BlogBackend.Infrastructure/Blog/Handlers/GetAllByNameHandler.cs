@@ -7,7 +7,7 @@ using BlogBackend.Core.Blog.Models;
 using BlogBackend.Infrastructure.Blog.Queries;
 using MediatR;
 
-public class GetAllByNameHandler : IRequestHandler<GetAllByNameQuery, IEnumerable<Blog?>>
+public class GetAllByNameHandler : IRequestHandler<GetAllBlogsByNameQuery, IEnumerable<Blog?>>
 {
     private readonly IBlogRepository repository;
     public GetAllByNameHandler(IBlogRepository repository)
@@ -15,7 +15,7 @@ public class GetAllByNameHandler : IRequestHandler<GetAllByNameQuery, IEnumerabl
         this.repository = repository;
     }
 
-    public async Task<IEnumerable<Blog?>> Handle(GetAllByNameQuery request, CancellationToken cancellationToken)
+    public async Task<IEnumerable<Blog?>> Handle(GetAllBlogsByNameQuery request, CancellationToken cancellationToken)
     {
         if(string.IsNullOrEmpty(request.Name) || string.IsNullOrWhiteSpace(request.Name)) {
             throw new ArgumentException("incorrect param of search");

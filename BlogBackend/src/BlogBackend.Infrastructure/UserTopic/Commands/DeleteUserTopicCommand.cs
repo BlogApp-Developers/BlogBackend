@@ -2,7 +2,7 @@ namespace BlogBackend.Infrastructure.UserTopic.Commands;
 
 using MediatR;
 
-public class DeleteCommand : IRequest
+public class DeleteUserTopicCommand : IRequest
 {
     public int Id { get; set; }
 }

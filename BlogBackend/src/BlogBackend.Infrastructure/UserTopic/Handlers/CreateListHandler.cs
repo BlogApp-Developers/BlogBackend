@@ -9,7 +9,7 @@ using System.Threading;
 using BlogBackend.Core.UserTopic.Repositories.Base;
 using BlogBackend.Core.UserTopic.Models;
 
-public class CreateListHandler : IRequestHandler<CreateListCommand>
+public class CreateListHandler : IRequestHandler<CreateUserTopicsListCommand>
 {
     private readonly IUserTopicRepository repository;
     public CreateListHandler(IUserTopicRepository repository)
@@ -17,7 +17,7 @@ public class CreateListHandler : IRequestHandler<CreateListCommand>
         this.repository = repository;
     }
 
-    public async Task Handle(CreateListCommand request, CancellationToken cancellationToken)
+    public async Task Handle(CreateUserTopicsListCommand request, CancellationToken cancellationToken)
     {
         if(request.UserId <= 0) {
             throw new ArgumentException("userId is incorrect");
