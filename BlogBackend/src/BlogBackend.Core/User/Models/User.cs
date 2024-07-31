@@ -6,7 +6,7 @@ using BlogBackend.Core.UserTopic.Models;
 
 public class User : IdentityUser<int>
 {
-    [Required]
     public string? AvatarUrl { get; set; }
     public IEnumerable<UserTopic>? Topics {set; get;}
+    public string? AboutMe { get; set; }
 }
