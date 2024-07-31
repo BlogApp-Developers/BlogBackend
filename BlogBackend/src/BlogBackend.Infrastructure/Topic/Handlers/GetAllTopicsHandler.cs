@@ -5,10 +5,10 @@ using BlogBackend.Core.Topic.Models;
 using BlogBackend.Core.Topic.Repositories.Base;
 using BlogBackend.Infrastructure.Topic.Queries;
 
-public class GetAllHandler : IRequestHandler<GetAllTopicsQuery, IEnumerable<Topic?>>
+public class GetAllTopicsHandler : IRequestHandler<GetAllTopicsQuery, IEnumerable<Topic?>>
 {
     private readonly ITopicRepository repository;
-    public GetAllHandler(ITopicRepository repository)
+    public GetAllTopicsHandler(ITopicRepository repository)
     {
         this.repository = repository;
     }

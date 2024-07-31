@@ -9,10 +9,10 @@ using System.Threading;
 using BlogBackend.Core.UserTopic.Repositories.Base;
 using BlogBackend.Core.UserTopic.Models;
 
-public class CreateListHandler : IRequestHandler<CreateUserTopicsListCommand>
+public class CreateUserTopicsListHandler : IRequestHandler<CreateUserTopicsListCommand>
 {
     private readonly IUserTopicRepository repository;
-    public CreateListHandler(IUserTopicRepository repository)
+    public CreateUserTopicsListHandler(IUserTopicRepository repository)
     {
         this.repository = repository;
     }

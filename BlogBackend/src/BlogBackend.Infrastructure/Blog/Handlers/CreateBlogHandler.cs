@@ -7,10 +7,10 @@ using System.Threading;
 using BlogBackend.Core.Blog.Repositories.Base;
 using BlogBackend.Core.Blog.Models;
 
-public class CreateHandler : IRequestHandler<CreateBlogCommand>
+public class CreateBlogHandler : IRequestHandler<CreateBlogCommand>
 {
     private readonly IBlogRepository repository;
-    public CreateHandler(IBlogRepository repository)
+    public CreateBlogHandler(IBlogRepository repository)
     {
         this.repository = repository;
     }

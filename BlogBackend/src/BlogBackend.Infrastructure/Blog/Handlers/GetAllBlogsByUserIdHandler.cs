@@ -5,10 +5,10 @@ using BlogBackend.Core.Blog.Models;
 using BlogBackend.Core.Blog.Repositories.Base;
 using BlogBackend.Infrastructure.Blog.Queries;
 
-public class GetAllByUserIdHandler : IRequestHandler<GetAllBlogsByUserIdQuery, IEnumerable<Blog?>>
+public class GetAllBlogsByUserIdHandler : IRequestHandler<GetAllBlogsByUserIdQuery, IEnumerable<Blog?>>
 {
     private readonly IBlogRepository repository;
-    public GetAllByUserIdHandler(IBlogRepository repository)
+    public GetAllBlogsByUserIdHandler(IBlogRepository repository)
     {
         this.repository = repository;
     }

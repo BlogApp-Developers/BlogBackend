@@ -7,10 +7,10 @@ using BlogBackend.Core.Blog.Models;
 using BlogBackend.Infrastructure.Blog.Queries;
 using MediatR;
 
-public class GetAllByNameHandler : IRequestHandler<GetAllBlogsByNameQuery, IEnumerable<Blog?>>
+public class GetAllBlogsByNameHandler : IRequestHandler<GetAllBlogsByNameQuery, IEnumerable<Blog?>>
 {
     private readonly IBlogRepository repository;
-    public GetAllByNameHandler(IBlogRepository repository)
+    public GetAllBlogsByNameHandler(IBlogRepository repository)
     {
         this.repository = repository;
     }

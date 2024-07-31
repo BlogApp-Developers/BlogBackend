@@ -7,10 +7,10 @@ using System.Threading;
 using BlogBackend.Core.UserTopic.Repositories.Base;
 using BlogBackend.Core.UserTopic.Models;
 
-public class DeleteHandler : IRequestHandler<DeleteUserTopicCommand>
+public class DeleteUserTopicHandler : IRequestHandler<DeleteUserTopicCommand>
 {
     private readonly IUserTopicRepository repository;
-    public DeleteHandler(IUserTopicRepository repository)
+    public DeleteUserTopicHandler(IUserTopicRepository repository)
     {
         this.repository = repository;
     }

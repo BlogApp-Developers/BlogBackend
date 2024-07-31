@@ -5,10 +5,10 @@ using BlogBackend.Core.Topic.Models;
 using BlogBackend.Core.Topic.Repositories.Base;
 using BlogBackend.Infrastructure.Topic.Queries;
 
-public class GetByIdHandler : IRequestHandler<GetTopicByIdQuery, Topic?>
+public class GetTopicByIdHandler : IRequestHandler<GetTopicByIdQuery, Topic?>
 {
     private readonly ITopicRepository repository;
-    public GetByIdHandler(ITopicRepository repository)
+    public GetTopicByIdHandler(ITopicRepository repository)
     {
         this.repository = repository;
     }
