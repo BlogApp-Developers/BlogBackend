@@ -3,15 +3,17 @@ using BlogBackend.Core.User.Models;
 using BlogBackend.Presentation.Verification.Base;
 using FluentValidation;
 using MediatR;
-using System.Net;
-using System.Net.Http;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.IdentityModel.Tokens.Jwt;
-using BlogBackend.Core.RefreshToken.Entity;
+using BlogBackend.Infrastructure.RefreshToken.Command;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Options;
+using BlogBackend.Presentation.Options;
+using System.ComponentModel.DataAnnotations;
 
 namespace BlogBackend.Presentation.Controllers;
 
@@ -25,6 +27,7 @@ public class IdentityController : Controller
     private readonly IValidator<LoginDto> userLoginValidator;
     private readonly IEmailService emailService;
     private readonly ISender sender;
+    private readonly JwtOptions jwtOptions;
 
     public IdentityController(ISender sender, 
         IValidator<LoginDto> userLoginValidator, 
@@ -32,7 +35,8 @@ public class IdentityController : Controller
         UserManager<User> userManager, 
         IValidator<RegistrationDto> userValidator, 
         IDataProtectionProvider dataProtectionProvider, 
-        IEmailService emailService)
+        IEmailService emailService,
+        IOptionsSnapshot<JwtOptions> jwtOptionsSnapshot)
     {
         this.sender = sender;
         this.userLoginValidator = userLoginValidator;
@@ -41,34 +45,8 @@ public class IdentityController : Controller
         this.dataProtector = dataProtectionProvider.CreateProtector("identity");
         this.userValidator = userValidator;
         this.emailService = emailService;
+        this.jwtOptions =jwtOptionsSnapshot.Value;
     }
-
-    // [HttpGet]
-    // [Route("/[controller]/[action]", Name = "LoginView")]
-    // public IActionResult Login(string? ReturnUrl)
-    // {
-    //     var errorMessage = TempData["error"];
-    //     ViewBag.ReturnUrl = ReturnUrl;
-
-    //     if (errorMessage != null)
-    //     {
-    //         ModelState.AddModelError("All", errorMessage.ToString()!);
-    //     }
-
-    //     return View();
-    // }
-
-    // [HttpGet]
-    // [Route("/[controller]/[action]", Name = "RegistrationView")]
-    // public IActionResult Registration()
-    // {
-    //     if (TempData["error"] != null)
-    //     {
-    //         ModelState.AddModelError("All", "This Email already registered");
-    //     }
-
-    //     return View();
-    // }
 
     [HttpPost]
     [Route("/api/[controller]/[action]")]
@@ -112,7 +90,8 @@ public class IdentityController : Controller
 
     [HttpGet]
     [Route("/[controller]/[action]", Name = "ConfirmLogin")]
-    public async Task<IActionResult> ConfirmLogin(string token)
+    [ActionName("ConfirmLogin")]
+    public async Task<IActionResult> ConfirmEmailLogin(string token)
     {
         if (string.IsNullOrEmpty(token))
         {
@@ -135,56 +114,48 @@ public class IdentityController : Controller
             return BadRequest("User not found");
         }
 
-        var signInResult = await signInManager.SignInAsync(foundUser, isPersistent: true);
-
-        if(signInResult.Succeeded == false) {
-            return base.BadRequest("Incorrect Login or Password");
-        }
+        await signInManager.SignInAsync(foundUser, isPersistent: true);
 
         var roles = await userManager.GetRolesAsync(foundUser);
 
         var claims = roles
             .Select(roleStr => new Claim(ClaimTypes.Role, roleStr))
-            .Append(new Claim(ClaimTypes.NameIdentifier, foundUser.Id))
+            .Append(new Claim(ClaimTypes.NameIdentifier, foundUser.Id.ToString()))
             .Append(new Claim(ClaimTypes.Email, foundUser.Email ?? "not set"))
             .Append(new Claim(ClaimTypes.Name, foundUser.UserName ?? "not set"));
 
         var signingKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes);
         var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
 
-        var token = new JwtSecurityToken(
+        var jwtToken = new JwtSecurityToken(
             issuer: jwtOptions.Issuer,
             audience: jwtOptions.Audience,
             claims: claims,
-            //notBefore: DateTime.Now.AddMinutes(2),
             expires: DateTime.Now.AddMinutes(jwtOptions.LifeTimeInMinutes),
             signingCredentials: signingCredentials
         );
 
         var handler = new JwtSecurityTokenHandler();
-        var tokenStr = handler.WriteToken(token);
+        var tokenStr = handler.WriteToken(jwtToken);
 
-        // create refresh token
-        var refreshToken = new RefreshToken {
+
+        var createRefreshTokenCommand = new CreateRefreshTokenCommand {
             UserId = foundUser.Id,
             Token = Guid.NewGuid(),
         };
 
-        await dbContext.RefreshTokens.AddAsync(refreshToken);
-        await dbContext.SaveChangesAsync();
+        await sender.Send(createRefreshTokenCommand);
 
         return Ok(new {
-            refresh = refreshToken.Token,
+            refresh = createRefreshTokenCommand.Token,
             access = tokenStr,
         });
     }
 
-    
-
     [HttpPost]
     [Route("/api/[controller]/[action]", Name = "RegistrationEndpoint")]
     [ActionName("Registration")]
-    public async Task<IActionResult> SignUp([FromForm] RegistrationDto registrationDto, [FromForm] int[] selectedTopicIds)
+    public async Task<IActionResult> SignUp([FromForm] RegistrationDto registrationDto)
     {
         try
         {
@@ -195,29 +166,29 @@ public class IdentityController : Controller
                 {
                     ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
                 }
-                return View();
+                return BadRequest(ModelState);
             }
 
             var tokenData = $"{registrationDto.Email}:{registrationDto.Name}";
             var token = dataProtector.Protect(tokenData);
-            var confirmationLink = Url.Action("ConfirmEmail", "Identity", new { token, selectedTopicIds }, Request.Scheme);
-            var message = $"Please confirm your registration by clicking on the link: {HtmlEncoder.Default.Encode(confirmationLink)}";
+            var confirmationLink = Url.Action("ConfirmEmail", "Identity", new { token }, Request.Scheme);
+            var message = $"Please confirm your registration by clicking on the link: {HtmlEncoder.Default.Encode(confirmationLink!)}";
 
-            await emailService.SendEmailAsync(registrationDto.Email, "Confirm your email", message);
+            await emailService.SendEmailAsync(registrationDto.Email!, "Confirm your email", message);
             TempData["Email"] = registrationDto.Email;
+
+            return Ok();
         }
         catch (Exception ex)
         {
-            TempData["error"] = ex.Message;
-            return RedirectToRoute("RegistrationView");
+            return BadRequest(ex.Message);
         }
-
-        return RedirectToRoute("ConfirmationView");
     }
 
     [HttpGet]
-    [Route("/[controller]/[action]", Name = "ConfirmEmail")]
-    public async Task<IActionResult> ConfirmEmail(string token)
+    [Route("/[controller]/[action]", Name = "ConfirmEmailRegistration")]
+    [ActionName("ConfirmRegistration")]
+    public async Task<IActionResult> ConfirmEmailRegistration(string token)
     {
         if (string.IsNullOrEmpty(token))
         {
@@ -247,20 +218,163 @@ public class IdentityController : Controller
             return BadRequest(string.Join("\n", result.Errors.Select(error => error.Description)));
         }
 
-        await signInManager.SignInAsync(user, isPersistent: true);
+        var foundUser = await userManager.FindByEmailAsync(user.Email);
 
-        return RedirectToAction("ChooseTags", "Topic");
+        await signInManager.SignInAsync(foundUser!, isPersistent: true);
+
+        var roles = await userManager.GetRolesAsync(foundUser!);
+
+        var claims = roles
+            .Select(roleStr => new Claim(ClaimTypes.Role, roleStr))
+            .Append(new Claim(ClaimTypes.NameIdentifier, foundUser!.Id.ToString()))
+            .Append(new Claim(ClaimTypes.Email, foundUser.Email ?? "not set"))
+            .Append(new Claim(ClaimTypes.Name, foundUser.UserName ?? "not set"));
+
+        var signingKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes);
+        var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+
+        var jwtToken = new JwtSecurityToken(
+            issuer: jwtOptions.Issuer,
+            audience: jwtOptions.Audience,
+            claims: claims,
+            expires: DateTime.Now.AddMinutes(jwtOptions.LifeTimeInMinutes),
+            signingCredentials: signingCredentials
+        );
+
+        var handler = new JwtSecurityTokenHandler();
+        var tokenStr = handler.WriteToken(jwtToken);
+
+        var createRefreshTokenCommand = new CreateRefreshTokenCommand {
+            UserId = foundUser.Id,
+            Token = Guid.NewGuid(),
+        };
+
+        await sender.Send(createRefreshTokenCommand);
+
+        return Ok(new {
+            refresh = createRefreshTokenCommand.Token,
+            access = tokenStr,
+        });
+        
     }
 
-    // [HttpGet]
-    // [Route("[controller]/[action]", Name = "ConfirmationView")]
-    // public IActionResult Confirmation()
-    // {
-    //     string email = TempData["Email"] as string;
+    [HttpPut]
+    [ActionName("Token")]
+    public async Task<IActionResult> UpdateToken([Required]Guid refresh) {
+        var tokenStr = base.HttpContext.Request.Headers.Authorization.FirstOrDefault();
 
-    //     var model = new RegistrationDto { Email = email };
-    //     return View(model);
-    // }
+        if(tokenStr is null) {
+            return base.StatusCode(401);
+        }
+
+        if(tokenStr.StartsWith("Bearer ")) {
+            tokenStr = tokenStr.Substring("Bearer ".Length);
+        }
+
+        var handler = new JwtSecurityTokenHandler();
+        var tokenValidationResult = await handler.ValidateTokenAsync(
+            tokenStr,
+            new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = jwtOptions.Issuer,
+
+                ValidateAudience = true,
+                ValidAudience = jwtOptions.Audience,
+
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes)
+            }
+        );
+
+        if(tokenValidationResult.IsValid == false) {
+            return BadRequest(tokenValidationResult.Exception);
+        }
+
+        var token = handler.ReadJwtToken(tokenStr);
+
+        Claim? idClaim = token.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.NameIdentifier);
+
+        if(idClaim is null) {
+            return BadRequest($"Token has no claim with type '{ClaimTypes.NameIdentifier}'");
+        }
+
+        var userId = idClaim.Value;
+
+        var foundUser = await userManager.FindByIdAsync(userId);
+
+        if(foundUser is null) {
+            return BadRequest($"User not found by id: '{userId}'");
+        }
+
+        // check refresh token
+        var oldRefreshToken = await dbContext.RefreshTokens.FirstOrDefaultAsync(rt => (rt.Token == refresh) && (rt.UserId == foundUser.Id));
+
+        // if token stealed
+        /*
+        if (oldRefreshToken.State == RefreshTokenStates.ForUpdate) {
+            var allUserRefreshTokens = dbContext.RefreshTokens.Where(rt => rt.UserId == foundUser.Id);
+            dbContext.RefreshTokens.RemoveRange(allUserRefreshTokens);
+            await dbContext.SaveChangesAsync();
+        }
+        */
+
+
+        // if(oldRefreshToken.Status == RefreshTokenStates.RemovedBecauseStealed) {
+        //     return BadRequest();
+        // }
+
+        // if(oldRefreshToken.Status == RefreshTokenStates.ForceLogOut) {
+        //     return BadRequest();
+        // }
+
+        if(oldRefreshToken is null) {
+            var allUserRefreshTokens = dbContext.RefreshTokens.Where(rt => rt.UserId == foundUser.Id);
+            // allUserRefreshTokens.Update(rt => rt.Status = RefreshTokenStates.RemovedBecauseStealed);
+            // await dbContext.SaveChangesAsync();
+            // return BadRequest();
+            dbContext.RefreshTokens.RemoveRange(allUserRefreshTokens);
+            await dbContext.SaveChangesAsync();
+
+            return BadRequest("Refresh token not found!");
+        }
+
+        // update refresh token
+        dbContext.RefreshTokens.Remove(oldRefreshToken);
+        var newRefreshToken = new RefreshToken  {
+            UserId = foundUser.Id,
+            Token = Guid.NewGuid()
+        };
+        await dbContext.RefreshTokens.AddAsync(newRefreshToken);
+        await dbContext.SaveChangesAsync();
+
+        var roles = await userManager.GetRolesAsync(foundUser);
+        
+        var claims = roles
+            .Select(roleStr => new Claim(ClaimTypes.Role, roleStr))
+            .Append(new Claim(ClaimTypes.NameIdentifier, foundUser.Id.ToString()))
+            .Append(new Claim(ClaimTypes.Email, foundUser.Email ?? "not set"))
+            .Append(new Claim(ClaimTypes.Name, foundUser.UserName ?? "not set"));
+
+        var signingKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes);
+        var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+
+        var newToken = new JwtSecurityToken(
+            issuer: jwtOptions.Issuer,
+            audience: jwtOptions.Audience,
+            claims: claims,
+            //expires: DateTime.Now.AddMinutes(jwtOptions.LifeTimeInMinutes),
+            expires: DateTime.Now.AddSeconds(10),
+            signingCredentials: signingCredentials
+        );
+
+        var newTokenStr = handler.WriteToken(newToken);
+
+        return Ok(new {
+            refresh = newRefreshToken.Token,
+            access = newTokenStr,
+        });
+    }
 }
 
 
