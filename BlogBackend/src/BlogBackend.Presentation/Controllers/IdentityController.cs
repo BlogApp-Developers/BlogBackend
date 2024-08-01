@@ -258,123 +258,124 @@ public class IdentityController : Controller
         
     }
 
-    [HttpPut]
-    [ActionName("Token")]
-    public async Task<IActionResult> UpdateToken([Required]Guid refresh) {
-        var tokenStr = base.HttpContext.Request.Headers.Authorization.FirstOrDefault();
+    // [HttpPut]
+    // [ActionName("Token")]
+    // public async Task<IActionResult> UpdateToken([Required]Guid refresh) {
+    //     var tokenStr = base.HttpContext.Request.Headers.Authorization.FirstOrDefault();
 
-        if(tokenStr is null) {
-            return base.StatusCode(401);
-        }
+    //     if(tokenStr is null) {
+    //         return base.StatusCode(401);
+    //     }
 
-        if(tokenStr.StartsWith("Bearer ")) {
-            tokenStr = tokenStr.Substring("Bearer ".Length);
-        }
+    //     if(tokenStr.StartsWith("Bearer ")) {
+    //         tokenStr = tokenStr.Substring("Bearer ".Length);
+    //     }
 
-        var handler = new JwtSecurityTokenHandler();
-        var tokenValidationResult = await handler.ValidateTokenAsync(
-            tokenStr,
-            new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidIssuer = jwtOptions.Issuer,
+    //     var handler = new JwtSecurityTokenHandler();
+    //     var tokenValidationResult = await handler.ValidateTokenAsync(
+    //         tokenStr,
+    //         new TokenValidationParameters
+    //         {
+    //             ValidateIssuer = true,
+    //             ValidIssuer = jwtOptions.Issuer,
 
-                ValidateAudience = true,
-                ValidAudience = jwtOptions.Audience,
+    //             ValidateAudience = true,
+    //             ValidAudience = jwtOptions.Audience,
 
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes)
-            }
-        );
+    //             ValidateIssuerSigningKey = true,
+    //             IssuerSigningKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes)
+    //         }
+    //     );
 
-        if(tokenValidationResult.IsValid == false) {
-            return BadRequest(tokenValidationResult.Exception);
-        }
+    //     if(tokenValidationResult.IsValid == false) {
+    //         return BadRequest(tokenValidationResult.Exception);
+    //     }
 
-        var token = handler.ReadJwtToken(tokenStr);
+    //     var token = handler.ReadJwtToken(tokenStr);
 
-        Claim? idClaim = token.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.NameIdentifier);
+    //     Claim? idClaim = token.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.NameIdentifier);
 
-        if(idClaim is null) {
-            return BadRequest($"Token has no claim with type '{ClaimTypes.NameIdentifier}'");
-        }
+    //     if(idClaim is null) {
+    //         return BadRequest($"Token has no claim with type '{ClaimTypes.NameIdentifier}'");
+    //     }
 
-        var userId = idClaim.Value;
+    //     var userId = idClaim.Value;
 
-        var foundUser = await userManager.FindByIdAsync(userId);
+    //     var foundUser = await userManager.FindByIdAsync(userId);
 
-        if(foundUser is null) {
-            return BadRequest($"User not found by id: '{userId}'");
-        }
+    //     if(foundUser is null) {
+    //         return BadRequest($"User not found by id: '{userId}'");
+    //     }
 
-        // check refresh token
-        var oldRefreshToken = await dbContext.RefreshTokens.FirstOrDefaultAsync(rt => (rt.Token == refresh) && (rt.UserId == foundUser.Id));
+    //     // check refresh token
+    //     var oldRefreshToken = await dbContext.RefreshTokens.FirstOrDefaultAsync(rt => (rt.Token == refresh) && (rt.UserId == foundUser.Id));
 
-        // if token stealed
-        /*
-        if (oldRefreshToken.State == RefreshTokenStates.ForUpdate) {
-            var allUserRefreshTokens = dbContext.RefreshTokens.Where(rt => rt.UserId == foundUser.Id);
-            dbContext.RefreshTokens.RemoveRange(allUserRefreshTokens);
-            await dbContext.SaveChangesAsync();
-        }
-        */
+    //     // if token stealed
+    //     /*
+    //     if (oldRefreshToken.State == RefreshTokenStates.ForUpdate) {
+    //         var allUserRefreshTokens = dbContext.RefreshTokens.Where(rt => rt.UserId == foundUser.Id);
+    //         dbContext.RefreshTokens.RemoveRange(allUserRefreshTokens);
+    //         await dbContext.SaveChangesAsync();
+    //     }
+    //     */
 
 
-        // if(oldRefreshToken.Status == RefreshTokenStates.RemovedBecauseStealed) {
-        //     return BadRequest();
-        // }
+    //     // if(oldRefreshToken.Status == RefreshTokenStates.RemovedBecauseStealed) {
+    //     //     return BadRequest();
+    //     // }
 
-        // if(oldRefreshToken.Status == RefreshTokenStates.ForceLogOut) {
-        //     return BadRequest();
-        // }
+    //     // if(oldRefreshToken.Status == RefreshTokenStates.ForceLogOut) {
+    //     //     return BadRequest();
+    //     // }
 
-        if(oldRefreshToken is null) {
-            var allUserRefreshTokens = dbContext.RefreshTokens.Where(rt => rt.UserId == foundUser.Id);
-            // allUserRefreshTokens.Update(rt => rt.Status = RefreshTokenStates.RemovedBecauseStealed);
-            // await dbContext.SaveChangesAsync();
-            // return BadRequest();
-            dbContext.RefreshTokens.RemoveRange(allUserRefreshTokens);
-            await dbContext.SaveChangesAsync();
+    //     if(oldRefreshToken is null) {
+    //         var allUserRefreshTokens = dbContext.RefreshTokens.Where(rt => rt.UserId == foundUser.Id);
+    //         // allUserRefreshTokens.Update(rt => rt.Status = RefreshTokenStates.RemovedBecauseStealed);
+    //         // await dbContext.SaveChangesAsync();
+    //         // return BadRequest();
+    //         dbContext.RefreshTokens.RemoveRange(allUserRefreshTokens);
+    //         await dbContext.SaveChangesAsync();
 
-            return BadRequest("Refresh token not found!");
-        }
+    //         return BadRequest("Refresh token not found!");
+    //     }
 
-        // update refresh token
-        dbContext.RefreshTokens.Remove(oldRefreshToken);
-        var newRefreshToken = new RefreshToken  {
-            UserId = foundUser.Id,
-            Token = Guid.NewGuid()
-        };
-        await dbContext.RefreshTokens.AddAsync(newRefreshToken);
-        await dbContext.SaveChangesAsync();
+    //     // update refresh token
+    //     dbContext.RefreshTokens.Remove(oldRefreshToken);
+    //     var newRefreshToken = new RefreshToken  {
+    //         UserId = foundUser.Id,
+    //         Token = Guid.NewGuid()
+    //     };
+    //     await dbContext.RefreshTokens.AddAsync(newRefreshToken);
+    //     await dbContext.SaveChangesAsync();
 
-        var roles = await userManager.GetRolesAsync(foundUser);
+    //     var roles = await userManager.GetRolesAsync(foundUser);
         
-        var claims = roles
-            .Select(roleStr => new Claim(ClaimTypes.Role, roleStr))
-            .Append(new Claim(ClaimTypes.NameIdentifier, foundUser.Id.ToString()))
-            .Append(new Claim(ClaimTypes.Email, foundUser.Email ?? "not set"))
-            .Append(new Claim(ClaimTypes.Name, foundUser.UserName ?? "not set"));
+    //     var claims = roles
+    //         .Select(roleStr => new Claim(ClaimTypes.Role, roleStr))
+    //         .Append(new Claim(ClaimTypes.NameIdentifier, foundUser.Id.ToString()))
+    //         .Append(new Claim(ClaimTypes.Email, foundUser.Email ?? "not set"))
+    //         .Append(new Claim(ClaimTypes.Name, foundUser.UserName ?? "not set"));
 
-        var signingKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes);
-        var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+    //     var signingKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes);
+    //     var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
 
-        var newToken = new JwtSecurityToken(
-            issuer: jwtOptions.Issuer,
-            audience: jwtOptions.Audience,
-            claims: claims,
-            //expires: DateTime.Now.AddMinutes(jwtOptions.LifeTimeInMinutes),
-            expires: DateTime.Now.AddSeconds(10),
-            signingCredentials: signingCredentials
-        );
+    //     var newToken = new JwtSecurityToken(
+    //         issuer: jwtOptions.Issuer,
+    //         audience: jwtOptions.Audience,
+    //         claims: claims,
+    //         expires: DateTime.Now.AddMinutes(jwtOptions.LifeTimeInMinutes),
+    //         expires: DateTime.Now.AddSeconds(10),
+    //         signingCredentials: signingCredentials
+    //     );
 
-        var newTokenStr = handler.WriteToken(newToken);
+    //     var newTokenStr = handler.WriteToken(newToken);
 
-        return Ok(new {
-            refresh = newRefreshToken.Token,
-            access = newTokenStr,
-        });
-    }
+    //     return Ok(new {
+    //         refresh = newRefreshToken.Token,
+    //         access = newTokenStr,
+    //     });
+    // }
+
 }
 
 
