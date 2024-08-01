@@ -1,7 +1,6 @@
-namespace BlogBackend.Presentation.Verification.Base
+namespace BlogBackend.Presentation.Verification.Base;
+
+public interface IEmailService
 {
-    public interface IEmailService
-    {
-        public Task SendEmailAsync(string toEmail, string subject, string message);
-    }
+    public Task SendEmailAsync(string toEmail, string subject, string message);
 }

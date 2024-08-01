@@ -4,7 +4,7 @@ using BlogBackend.Core.Dtos.Models;
 using FluentValidation;
 
 
-namespace BlogApp.Presentation.Validators;
+namespace BlogBackend.Presentation.Validators;
 
 
 public class UserRegistrationValidator : AbstractValidator<RegistrationDto>

@@ -1,8 +1,9 @@
+namespace BlogBackend.Presentation.Verification;
+
 using System.Net;
 using System.Net.Mail;
-using System.Threading.Tasks;
 using BlogBackend.Presentation.Verification.Base;
-using Microsoft.Extensions.Configuration;
+
 
 public class EmailService : IEmailService
 {
@@ -16,13 +17,13 @@ public class EmailService : IEmailService
     public async Task SendEmailAsync(string toEmail, string subject, string message)
     {
         var smtpServer = configuration["EmailSettings:SmtpServer"];
-        var smtpPort = int.Parse(configuration["EmailSettings:SmtpPort"]);
+        var smtpPort = int.Parse(configuration["EmailSettings:SmtpPort"]!);
         var smtpUser = configuration["EmailSettings:SmtpUser"];
         var smtpPass = configuration["EmailSettings:SmtpPass"];
 
         var mailMessage = new MailMessage
         {
-            From = new MailAddress(smtpUser),
+            From = new MailAddress(smtpUser!),
             Subject = subject,
             Body = message,
             IsBodyHtml = true,
