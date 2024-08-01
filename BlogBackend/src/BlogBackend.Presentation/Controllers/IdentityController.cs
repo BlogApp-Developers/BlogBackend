@@ -3,14 +3,15 @@ using BlogBackend.Core.User.Models;
 using BlogBackend.Presentation.Verification.Base;
 using FluentValidation;
 using MediatR;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authorization;
+using System.Net;
+using System.Net.Http;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using System.IdentityModel.Tokens.Jwt;
+using BlogBackend.Core.RefreshToken.Entity;
 
 namespace BlogBackend.Presentation.Controllers;
 
@@ -71,17 +72,11 @@ public class IdentityController : Controller
 
     [HttpPost]
     [Route("/api/[controller]/[action]")]
+    [ActionName("Login")]
     public async Task<IActionResult> SignIn([FromForm] LoginDto loginDto)
     {
         try
         {
-            var user = await userManager.FindByEmailAsync(loginDto.Email!);
-
-            if (user == null)
-            {
-                return BadRequest("Incorrect email or password!");
-            }
-
             var validationResult = userLoginValidator.Validate(loginDto);
             if (!validationResult.IsValid)
             {
@@ -89,7 +84,14 @@ public class IdentityController : Controller
                 {
                     ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
                 }
-                return View();
+                return BadRequest(ModelState);
+            }
+
+            var user = await userManager.FindByEmailAsync(loginDto.Email!);
+
+            if (user == null)
+            {
+                return BadRequest("Incorrect email!");
             }
 
             var tokenData = $"{loginDto.Email}:{loginDto.Name}";
@@ -100,7 +102,7 @@ public class IdentityController : Controller
             await emailService.SendEmailAsync(loginDto.Email!, "Confirm your login", message);
             TempData["Email"] = loginDto.Email;
             
-            return RedirectToRoute("ConfirmationView");
+            return Ok();
         }
         catch (Exception ex)
         {
@@ -127,21 +129,61 @@ public class IdentityController : Controller
         var email = dataParts[0];
         var name = dataParts[1];
 
-        var user = await userManager.FindByEmailAsync(email);
-        if (user == null)
+        var foundUser = await userManager.FindByEmailAsync(email);
+        if (foundUser is null)
         {
             return BadRequest("User not found");
         }
 
-        await signInManager.SignInAsync(user, isPersistent: true);
+        var signInResult = await signInManager.SignInAsync(foundUser, isPersistent: true);
 
-        return RedirectToAction("Index", "Blog", new { userId = user.Id });
+        if(signInResult.Succeeded == false) {
+            return base.BadRequest("Incorrect Login or Password");
+        }
+
+        var roles = await userManager.GetRolesAsync(foundUser);
+
+        var claims = roles
+            .Select(roleStr => new Claim(ClaimTypes.Role, roleStr))
+            .Append(new Claim(ClaimTypes.NameIdentifier, foundUser.Id))
+            .Append(new Claim(ClaimTypes.Email, foundUser.Email ?? "not set"))
+            .Append(new Claim(ClaimTypes.Name, foundUser.UserName ?? "not set"));
+
+        var signingKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes);
+        var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: jwtOptions.Issuer,
+            audience: jwtOptions.Audience,
+            claims: claims,
+            //notBefore: DateTime.Now.AddMinutes(2),
+            expires: DateTime.Now.AddMinutes(jwtOptions.LifeTimeInMinutes),
+            signingCredentials: signingCredentials
+        );
+
+        var handler = new JwtSecurityTokenHandler();
+        var tokenStr = handler.WriteToken(token);
+
+        // create refresh token
+        var refreshToken = new RefreshToken {
+            UserId = foundUser.Id,
+            Token = Guid.NewGuid(),
+        };
+
+        await dbContext.RefreshTokens.AddAsync(refreshToken);
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new {
+            refresh = refreshToken.Token,
+            access = tokenStr,
+        });
     }
 
     
 
     [HttpPost]
     [Route("/api/[controller]/[action]", Name = "RegistrationEndpoint")]
+    [ActionName("Registration")]
     public async Task<IActionResult> SignUp([FromForm] RegistrationDto registrationDto, [FromForm] int[] selectedTopicIds)
     {
         try
