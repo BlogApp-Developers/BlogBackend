@@ -3,12 +3,12 @@ namespace BlogBackend.Presentation.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using MediatR;
 using BlogBackend.Infrastructure.Topic.Queries;
-using BlogBackend.Core.Topic.Models;
-using System.Text.Json;
 using BlogBackend.Infrastructure.UserTopic.Commands;
-using BlogBackend.Infrastructure.UserTopic.Queries;
+using Microsoft.AspNetCore.Authorization;
 
+[Authorize]
 [ApiController]
+[Route("api/[controller]")]
 public class TopicController : Controller
 {
     private readonly ISender sender;
@@ -18,15 +18,15 @@ public class TopicController : Controller
         this.sender = sender;
     }
 
-    [HttpGet("api/[controller]")]
+    [HttpGet]
     public async Task<IActionResult> ChooseTags()
     {
         try
         {
-            var getAllQuery = new GetAllQuery();
+            var getAllQuery = new GetAllTopicsQuery();
             var allTopics = await sender.Send(getAllQuery);
 
-            return View(allTopics);
+            return Ok(allTopics);
         }
         catch (Exception ex)
         {
@@ -34,12 +34,12 @@ public class TopicController : Controller
         }
     }
 
-    [HttpPost("[controller]/[action]/{userId}")]
+    [HttpPost("[action]/{userId}")]
     public async Task<IActionResult> CreatePreferences([FromBody]IEnumerable<int> topicsIds, int userId)
     {
         try
         {  
-            var createListCommand = new CreateListCommand()
+            var createListCommand = new CreateUserTopicsListCommand()
             {
                 TopicsIds = topicsIds,
                 UserId = userId
@@ -47,11 +47,15 @@ public class TopicController : Controller
 
             await sender.Send(createListCommand);
             
-            return RedirectToAction("Index", "Blog", new { userId });
+            return Ok();
         }
-        catch (Exception)
+        catch (ArgumentException ex)
         {
-            return RedirectToAction(controllerName: "Topic", actionName: "ChooseTags");
+            return BadRequest(ex.Message);
+        }
+        catch(Exception ex)
+        {
+            return StatusCode(500, ex.Message);
         }
     }
 }

@@ -8,6 +8,8 @@ using MediatR;
 using BlogBackend.Infrastructure.Blog.Commands;
 using BlogBackend.Infrastructure.UserTopic.Queries;
 using BlogBackend.Infrastructure.Topic.Queries;
+using System.Security.Claims;
+
 
 [ApiController]
 public class BlogController : Controller
@@ -25,7 +27,7 @@ public class BlogController : Controller
     {
         try
         {
-            var getAllByName = new GetAllByNameQuery()
+            var getAllByName = new GetAllBlogsByNameQuery()
             {
                 Name = name
             };
@@ -45,7 +47,7 @@ public class BlogController : Controller
     {
         try
         {
-            var getAllByTopicIdQuery = new GetAllByTopicIdQuery
+            var getAllByTopicIdQuery = new GetAllBlogsByTopicIdQuery
             {
                 TopicId = topicId
             };
@@ -100,16 +102,17 @@ public class BlogController : Controller
     {
         try
         {
-            var getBlogQuery = new Infrastructure.Blog.Queries.GetByIdQuery()
+            var getBlogQuery = new GetBlogByIdQuery()
             {
                 Id = blogId,
             };
 
             var blog = await sender.Send(getBlogQuery);
-            var getAllTopicsQuery = new GetAllQuery();
+            var getAllTopicsQuery = new GetAllTopicsQuery();
 
 
-            var userId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
+            var userIdStr = base.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            int.TryParse(userIdStr, out int userId);
 
           
             var getAllTopicsByUserIdQuery = new GetAllTopicsByUserIdQuery
@@ -120,9 +123,7 @@ public class BlogController : Controller
 
             ViewBag.Topics = topics;
 
-
-
-            return View(blog);
+            return Ok(blog);
         }
         catch (ArgumentException ex)
         {
@@ -142,7 +143,7 @@ public class BlogController : Controller
     {
         try
         {
-            var blogQuery = new Infrastructure.Blog.Queries.GetByIdQuery
+            var blogQuery = new GetBlogByIdQuery
             {
                 Id = id,
 
@@ -171,7 +172,7 @@ public class BlogController : Controller
         {
             var userId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
             var randomId = Random.Shared.Next(1, 100000);
-            var getBlogQuery = new BlogBackend.Infrastructure.Blog.Queries.GetByIdQuery()
+            var getBlogQuery = new GetBlogByIdQuery()
             {
                 Id = randomId,
             };
@@ -192,7 +193,7 @@ public class BlogController : Controller
 
             newBlog.CreationDate = DateTime.UtcNow;
 
-            var createCommand = new CreateCommand()
+            var createCommand = new CreateBlogCommand()
             {
                 Title = newBlog.Title,
                 Text = newBlog.Text,
