@@ -28,7 +28,7 @@ public class RefreshTokenEfCoreRepository : IRefreshTokenRepository
         await dbContext.SaveChangesAsync();
     }
 
-    public async Task DeleteRangeRefreshTokens(RefreshToken refreshToken)
+    public async Task DeleteRangeRefreshTokensAsync(RefreshToken refreshToken)
     {
         var refreshTokenToDelete = dbContext.RefreshTokens.Where(rt => rt.UserId == refreshToken.UserId);
         dbContext.RefreshTokens.RemoveRange(refreshTokenToDelete);
