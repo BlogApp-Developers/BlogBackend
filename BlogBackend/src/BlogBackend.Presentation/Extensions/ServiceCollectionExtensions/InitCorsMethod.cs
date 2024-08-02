@@ -6,10 +6,18 @@ public static class InitCorsMethod
     {
         serviceCollection.AddCors(options =>
         {
-            options.AddPolicy("BlogApp", policyBuilder =>
+            options.AddPolicy("LocalHostPolicy", policyBuilder =>
             {
                 policyBuilder
-                    .WithOrigins("http://localhost:5058")
+                    .WithOrigins("http://localhost")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+            });
+
+            options.AddPolicy("BlazorTestPolicy", policyBuilder =>
+            {
+                policyBuilder
+                    .WithOrigins("http://localhost:5234")
                     .AllowAnyHeader()
                     .AllowAnyMethod();
             });

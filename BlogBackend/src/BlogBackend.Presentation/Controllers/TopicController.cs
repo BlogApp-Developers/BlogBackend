@@ -5,6 +5,8 @@ using MediatR;
 using BlogBackend.Infrastructure.Topic.Queries;
 using BlogBackend.Infrastructure.UserTopic.Commands;
 using Microsoft.AspNetCore.Authorization;
+using BlogBackend.Infrastructure.UserTopic.Queries;
+
 
 [Authorize]
 [ApiController]
@@ -54,6 +56,26 @@ public class TopicController : Controller
             return BadRequest(ex.Message);
         }
         catch(Exception ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
+    }
+
+        [HttpGet("[action]")]
+    public async Task<IActionResult> GetPreferableTopics(int userId)
+    {
+        try
+        {
+            var getAllTopicsByUserIdQuery = new GetAllTopicsByUserIdQuery()
+            {
+                UserId = userId,
+            };
+
+            var preferableTopics = await sender.Send(getAllTopicsByUserIdQuery);
+
+            return Ok(preferableTopics);
+        }
+        catch (Exception ex)
         {
             return StatusCode(500, ex.Message);
         }

@@ -11,7 +11,6 @@ builder.Services.AddValidators();
 builder.Services.AddMediatR();
 
 
-
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

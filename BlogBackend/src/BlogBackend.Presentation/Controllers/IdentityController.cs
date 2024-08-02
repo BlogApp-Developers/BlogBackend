@@ -172,17 +172,16 @@ public class IdentityController : Controller
 
             var tokenData = $"{registrationDto.Email}:{registrationDto.Name}";
             var token = dataProtector.Protect(tokenData);
-            var confirmationLink = Url.Action("ConfirmEmail", "Identity", new { token }, Request.Scheme);
+            var confirmationLink = Url.Action("ConfirmRegistration", "Identity", new { token }, Request.Scheme);
             var message = $"Please confirm your registration by clicking on the link: {HtmlEncoder.Default.Encode(confirmationLink!)}";
 
             await emailService.SendEmailAsync(registrationDto.Email!, "Confirm your email", message);
-            TempData["Email"] = registrationDto.Email;
 
             return Ok();
         }
         catch (Exception ex)
         {
-            return BadRequest(ex.Message);
+            return StatusCode(500, ex.Message);
         }
     }
 
@@ -251,11 +250,10 @@ public class IdentityController : Controller
 
         await sender.Send(createRefreshTokenCommand);
 
-        return Ok(new {
-            refresh = createRefreshTokenCommand.Token,
-            access = tokenStr,
-        });
+        HttpContext.Response.Headers["access"] = tokenStr;
+        HttpContext.Response.Headers["refresh"] = createRefreshTokenCommand.Token.ToString("N");
         
+        return Redirect($"http://localhost:5234/choosetags?userId={foundUser!.Id}");
     }
 
     [HttpPut]
@@ -323,7 +321,7 @@ public class IdentityController : Controller
             {
                 var deleteRangeRefreshTokenCommand = new DeleteRangeRefreshTokenCommand()
                 {
-                    userId = userId
+                    UserId = userId
                 };
                 await sender.Send(deleteRangeRefreshTokenCommand);
                 return BadRequest("Refresh token not found!");

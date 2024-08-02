@@ -1,17 +1,15 @@
 namespace BlogBackend.Presentation.Controllers;
 
 using Microsoft.AspNetCore.Mvc;
-
 using BlogBackend.Core.Blog.Models;
 using BlogBackend.Infrastructure.Blog.Queries;
 using MediatR;
 using BlogBackend.Infrastructure.Blog.Commands;
-using BlogBackend.Infrastructure.UserTopic.Queries;
-using BlogBackend.Infrastructure.Topic.Queries;
-using System.Security.Claims;
-
+using Microsoft.AspNetCore.Authorization;
 
 [ApiController]
+[Authorize]
+[Route("api/[controller]")]
 public class BlogController : Controller
 {
     private readonly ISender sender;
@@ -21,9 +19,8 @@ public class BlogController : Controller
         this.sender = sender;
     }
 
-
-    [HttpGet("api/[controller]/SearchBlogsByName")]
-    public async Task<IEnumerable<Blog?>?> SearchBlogsByName(string? name)
+    [HttpGet("[action]")]
+    public async Task<IActionResult> SearchBlogsByName(string? name)
     {
         try
         {
@@ -34,15 +31,15 @@ public class BlogController : Controller
 
             var foundBlogs = await sender.Send(getAllByName);
 
-            return foundBlogs;
+            return Ok(foundBlogs);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return null;
+            return StatusCode(500, ex.Message);
         }
     }
 
-    [HttpGet("api/GetBlogsByTopic/")]
+    [HttpGet("[action]")]
     public async Task<ActionResult<IEnumerable<Blog>>> GetBlogsByTopic(int topicId)
     {
         try
@@ -59,45 +56,16 @@ public class BlogController : Controller
                 return NotFound("Blogs not found");
             }
 
-            // Проверьте данные перед отправкой на клиент
-            foreach (var blog in blogs)
-            {
-                Console.WriteLine($"API Blog: {blog.Title}, User: {blog.User?.UserName}");
-            }
-
             return Ok(blogs);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Error fetching blogs: {ex.Message}");
-            return StatusCode(500, "Internal server error");
-        }
-    }
-
-
-
-    [HttpGet("Blog/Index")]
-    public async Task<IActionResult> Index(int userId)
-    {
-        try
-        {
-            var getAllTopicsByUserIdQuery = new GetAllTopicsByUserIdQuery()
-            {
-                UserId = userId,
-            };
-
-            var preferableTopics = await sender.Send(getAllTopicsByUserIdQuery);
-
-            return View(preferableTopics);
         }
         catch (Exception ex)
         {
             return StatusCode(500, ex.Message);
         }
-
     }
 
-    [HttpGet("[controller]/{blogId}")]
+
+    [HttpGet("{blogId}")]
     public async Task<IActionResult> GetBlog(int blogId)
     {
         try
@@ -106,22 +74,8 @@ public class BlogController : Controller
             {
                 Id = blogId,
             };
-
+            
             var blog = await sender.Send(getBlogQuery);
-            var getAllTopicsQuery = new GetAllTopicsQuery();
-
-
-            var userIdStr = base.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            int.TryParse(userIdStr, out int userId);
-
-          
-            var getAllTopicsByUserIdQuery = new GetAllTopicsByUserIdQuery
-            {
-                UserId = userId,
-            };
-            var topics = await sender.Send(getAllTopicsByUserIdQuery);
-
-            ViewBag.Topics = topics;
 
             return Ok(blog);
         }
@@ -136,9 +90,7 @@ public class BlogController : Controller
     }
 
 
-
-
-    [HttpGet("[controller]/[action]/{id}")]
+    [HttpGet("[action]/{id}")]
     public async Task<IActionResult> Image(int id)
     {
         try
@@ -146,7 +98,6 @@ public class BlogController : Controller
             var blogQuery = new GetBlogByIdQuery
             {
                 Id = id,
-
             };
             var blog = await this.sender.Send(blogQuery);
             if (blog == null || string.IsNullOrEmpty(blog.PictureUrl))
@@ -158,14 +109,12 @@ public class BlogController : Controller
         }
         catch (Exception ex)
         {
-            System.Console.WriteLine(ex.Message);
-            return null;
+            return StatusCode(500, ex.Message);
         }
     }
+    
 
-
-
-    [HttpPost("api/Blog/CreateBlog")]
+    [HttpPost]
     public async Task<IActionResult> CreateBlog([FromForm] Blog newBlog, IFormFile image)
     {
         try
@@ -206,7 +155,9 @@ public class BlogController : Controller
 
             await sender.Send(createCommand);
 
-            return RedirectToAction("Index", "Blog", new { userId });
+            return Ok();
+
+            // return RedirectToAction("Index", "Blog", new { userId });
         }
         catch (ArgumentException ex)
         {
