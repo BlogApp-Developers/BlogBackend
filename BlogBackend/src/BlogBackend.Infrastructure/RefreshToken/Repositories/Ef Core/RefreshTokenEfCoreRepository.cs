@@ -28,6 +28,13 @@ public class RefreshTokenEfCoreRepository : IRefreshTokenRepository
         await dbContext.SaveChangesAsync();
     }
 
+    public async Task DeleteRangeRefreshTokens(RefreshToken refreshToken)
+    {
+        var refreshTokenToDelete = dbContext.RefreshTokens.Where(rt => rt.UserId == refreshToken.UserId);
+        dbContext.RefreshTokens.RemoveRange(refreshTokenToDelete);
+        await dbContext.SaveChangesAsync();
+    }
+
     public async Task<RefreshToken?> GetRefreshTokenAsync(RefreshToken refreshToken)
     {
         return await dbContext.RefreshTokens.Where(refToken => refToken.Token == refreshToken.Token && refToken.UserId == refreshToken.UserId).FirstOrDefaultAsync();

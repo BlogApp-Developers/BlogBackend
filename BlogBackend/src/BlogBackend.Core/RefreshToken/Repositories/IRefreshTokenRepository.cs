@@ -6,5 +6,5 @@ using BlogBackend.Core.RefreshToken.Entity;
     public interface IRefreshTokenRepository : IDeleteAsync<RefreshToken>, ICreateAsync<RefreshToken>
     {
         public Task<RefreshToken?> GetRefreshTokenAsync(RefreshToken refreshToken);
-        public Task<RefreshToken?> DeleteRangeRefreshTokens(RefreshToken refreshToken);
+        public Task DeleteRangeRefreshTokens(RefreshToken refreshToken);
     }
