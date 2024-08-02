@@ -33,12 +33,12 @@ public class IdentityController : Controller
     private readonly ISender sender;
     private readonly JwtOptions jwtOptions;
 
-    public IdentityController(ISender sender, 
-        IValidator<LoginDto> userLoginValidator, 
-        SignInManager<User> signInManager, 
-        UserManager<User> userManager, 
-        IValidator<RegistrationDto> userValidator, 
-        IDataProtectionProvider dataProtectionProvider, 
+    public IdentityController(ISender sender,
+        IValidator<LoginDto> userLoginValidator,
+        SignInManager<User> signInManager,
+        UserManager<User> userManager,
+        IValidator<RegistrationDto> userValidator,
+        IDataProtectionProvider dataProtectionProvider,
         IEmailService emailService,
         IOptionsSnapshot<JwtOptions> jwtOptionsSnapshot)
     {
@@ -49,7 +49,7 @@ public class IdentityController : Controller
         this.dataProtector = dataProtectionProvider.CreateProtector("identity");
         this.userValidator = userValidator;
         this.emailService = emailService;
-        this.jwtOptions =jwtOptionsSnapshot.Value;
+        this.jwtOptions = jwtOptionsSnapshot.Value;
     }
 
     [HttpPost]
@@ -82,7 +82,7 @@ public class IdentityController : Controller
 
             await emailService.SendEmailAsync(loginDto.Email!, "Confirm your login", message);
             TempData["Email"] = loginDto.Email;
-            
+
             return Ok();
         }
         catch (Exception ex)
@@ -141,14 +141,16 @@ public class IdentityController : Controller
         var tokenStr = handler.WriteToken(jwtToken);
 
 
-        var createRefreshTokenCommand = new CreateRefreshTokenCommand {
+        var createRefreshTokenCommand = new CreateRefreshTokenCommand
+        {
             UserId = foundUser.Id,
             Token = Guid.NewGuid(),
         };
 
         await sender.Send(createRefreshTokenCommand);
 
-        return Ok(new {
+        return Ok(new
+        {
             refresh = createRefreshTokenCommand.Token,
             access = tokenStr,
         });
@@ -172,7 +174,7 @@ public class IdentityController : Controller
 
             var tokenData = $"{registrationDto.Email}:{registrationDto.Name}";
             var token = dataProtector.Protect(tokenData);
-            var confirmationLink = Url.Action("ConfirmEmail", "Identity", new { token }, Request.Scheme);
+            var confirmationLink = Url.Action("ConfirmRegistration", "Identity", new { token }, Request.Scheme);
             var message = $"Please confirm your registration by clicking on the link: {HtmlEncoder.Default.Encode(confirmationLink!)}";
 
             await emailService.SendEmailAsync(registrationDto.Email!, "Confirm your email", message);
@@ -185,6 +187,7 @@ public class IdentityController : Controller
             return BadRequest(ex.Message);
         }
     }
+
 
     [HttpGet]
     [ActionName("ConfirmRegistration")]
@@ -222,55 +225,145 @@ public class IdentityController : Controller
 
         await signInManager.SignInAsync(foundUser!, isPersistent: true);
 
-        var roles = await userManager.GetRolesAsync(foundUser!);
-
-        var claims = roles
-            .Select(roleStr => new Claim(ClaimTypes.Role, roleStr))
-            .Append(new Claim(ClaimTypes.NameIdentifier, foundUser!.Id.ToString()))
-            .Append(new Claim(ClaimTypes.Email, foundUser.Email ?? "not set"))
-            .Append(new Claim(ClaimTypes.Name, foundUser.UserName ?? "not set"));
-
-        var signingKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes);
-        var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
-
-        var jwtToken = new JwtSecurityToken(
-            issuer: jwtOptions.Issuer,
-            audience: jwtOptions.Audience,
-            claims: claims,
-            expires: DateTime.Now.AddMinutes(jwtOptions.LifeTimeInMinutes),
-            signingCredentials: signingCredentials
-        );
-
-        var handler = new JwtSecurityTokenHandler();
-        var tokenStr = handler.WriteToken(jwtToken);
-
-        var createRefreshTokenCommand = new CreateRefreshTokenCommand {
-            UserId = foundUser.Id,
-            Token = Guid.NewGuid(),
-        };
-
-        await sender.Send(createRefreshTokenCommand);
-
-        return Ok(new {
-            refresh = createRefreshTokenCommand.Token,
-            access = tokenStr,
-        });
         
+        return Redirect($"http://localhost:5234/choosetags?userId={foundUser!.Id}");
     }
+
+
+    // [HttpPut]
+    // [Authorize]
+    // public async Task<IActionResult> UpdateToken([Required]Guid refresh) 
+    // {
+    //     try
+    //     {
+    //         var tokenStr = base.HttpContext.Request.Headers.Authorization.FirstOrDefault();
+
+    //         if(tokenStr is null) {
+    //             return base.StatusCode(401);
+    //         }
+
+    //         if(tokenStr.StartsWith("Bearer ")) {
+    //             tokenStr = tokenStr.Substring("Bearer ".Length);
+    //         }
+
+    //         var handler = new JwtSecurityTokenHandler();
+    //         var tokenValidationResult = await handler.ValidateTokenAsync(
+    //             tokenStr,
+    //             new TokenValidationParameters
+    //             {
+    //                 ValidateIssuer = true,
+    //                 ValidIssuer = jwtOptions.Issuer,
+
+    //                 ValidateAudience = true,
+    //                 ValidAudience = jwtOptions.Audience,
+
+    //                 ValidateIssuerSigningKey = true,
+    //                 IssuerSigningKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes)
+    //             }
+    //         );
+
+    //         if(tokenValidationResult.IsValid == false) {
+    //             return BadRequest(tokenValidationResult.Exception);
+    //         }
+
+    //         var token = handler.ReadJwtToken(tokenStr);
+
+    //         Claim? idClaim = token.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.NameIdentifier);
+
+    //         if(idClaim is null) {
+    //             return BadRequest($"Token has no claim with type '{ClaimTypes.NameIdentifier}'");
+    //         }
+
+    //         int.TryParse(idClaim.Value, out int userId);
+    //         var userIdstr = idClaim.Value;
+
+    //         var foundUser = await userManager.FindByIdAsync(userIdstr);
+
+    //         if(foundUser is null) {
+    //             return BadRequest($"User not found by id: '{userId}'");
+    //         }
+
+    //         var getRefrshCTokenQuery = new GetRefreshTokenQuery()
+    //         {
+    //             Token = refresh,
+    //             UserId = userId,
+    //         };
+
+    //         var oldRefreshToken = await sender.Send(getRefrshCTokenQuery);
+
+    //         if(oldRefreshToken is null)
+    //         {
+    //             var deleteRangeRefreshTokenCommand = new DeleteRangeRefreshTokenCommand()
+    //             {
+    //                 userId = userId
+    //             };
+    //             await sender.Send(deleteRangeRefreshTokenCommand);
+    //             return BadRequest("Refresh token not found!");
+    //         }
+
+
+    //         var deleteRefreshTokenCommand = new DeleteRefreshTokenCommand()
+    //         {
+    //             Token = oldRefreshToken.Token,
+    //             UserId = userId,
+    //         };
+
+    //         await sender.Send(deleteRefreshTokenCommand);
+
+    //         var createRefreshTokenCommand = new CreateRefreshTokenCommand {
+    //             UserId = foundUser.Id,
+    //             Token = Guid.NewGuid(),
+    //         };
+
+    //         await sender.Send(createRefreshTokenCommand);
+
+    //         var roles = await userManager.GetRolesAsync(foundUser);
+
+    //         var claims = roles
+    //             .Select(roleStr => new Claim(ClaimTypes.Role, roleStr))
+    //             .Append(new Claim(ClaimTypes.NameIdentifier, foundUser.Id.ToString()))
+    //             .Append(new Claim(ClaimTypes.Email, foundUser.Email ?? "not set"))
+    //             .Append(new Claim(ClaimTypes.Name, foundUser.UserName ?? "not set"));
+
+    //         var signingKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes);
+    //         var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+
+    //         var newToken = new JwtSecurityToken(
+    //             issuer: jwtOptions.Issuer,
+    //             audience: jwtOptions.Audience,
+    //             claims: claims,
+    //             expires: DateTime.Now.AddMinutes(jwtOptions.LifeTimeInMinutes),
+    //             signingCredentials: signingCredentials
+    //         );
+
+    //         var newTokenStr = handler.WriteToken(newToken);
+
+    //         return Ok(new {
+    //             refresh = createRefreshTokenCommand.Token,
+    //             access = newTokenStr,
+    //         });
+    //     }
+    //     catch(Exception ex)
+    //     {
+    //         return StatusCode(500, ex.Message);
+    //     }
+    // }
 
     [HttpPut]
     [Authorize]
-    public async Task<IActionResult> UpdateToken([Required]Guid refresh) 
+    public async Task<IActionResult> LogOut([Required] Guid refresh)
     {
         try
         {
             var tokenStr = base.HttpContext.Request.Headers.Authorization.FirstOrDefault();
 
-            if(tokenStr is null) {
+            if (tokenStr is null)
+            {
                 return base.StatusCode(401);
             }
 
-            if(tokenStr.StartsWith("Bearer ")) {
+            if (tokenStr.StartsWith("Bearer "))
+            {
                 tokenStr = tokenStr.Substring("Bearer ".Length);
             }
 
@@ -290,7 +383,8 @@ public class IdentityController : Controller
                 }
             );
 
-            if(tokenValidationResult.IsValid == false) {
+            if (tokenValidationResult.IsValid == false)
+            {
                 return BadRequest(tokenValidationResult.Exception);
             }
 
@@ -298,7 +392,8 @@ public class IdentityController : Controller
 
             Claim? idClaim = token.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.NameIdentifier);
 
-            if(idClaim is null) {
+            if (idClaim is null)
+            {
                 return BadRequest($"Token has no claim with type '{ClaimTypes.NameIdentifier}'");
             }
 
@@ -307,126 +402,8 @@ public class IdentityController : Controller
 
             var foundUser = await userManager.FindByIdAsync(userIdstr);
 
-            if(foundUser is null) {
-                return BadRequest($"User not found by id: '{userId}'");
-            }
-
-            var getRefrshCTokenQuery = new GetRefreshTokenQuery()
+            if (foundUser is null)
             {
-                Token = refresh,
-                UserId = userId,
-            };
-
-            var oldRefreshToken = await sender.Send(getRefrshCTokenQuery);
-
-            if(oldRefreshToken is null)
-            {
-                var deleteRangeRefreshTokenCommand = new DeleteRangeRefreshTokenCommand()
-                {
-                    userId = userId
-                };
-                await sender.Send(deleteRangeRefreshTokenCommand);
-                return BadRequest("Refresh token not found!");
-            }
-
-
-            var deleteRefreshTokenCommand = new DeleteRefreshTokenCommand()
-            {
-                Token = oldRefreshToken.Token,
-                UserId = userId,
-            };
-
-            await sender.Send(deleteRefreshTokenCommand);
-
-            var createRefreshTokenCommand = new CreateRefreshTokenCommand {
-                UserId = foundUser.Id,
-                Token = Guid.NewGuid(),
-            };
-
-            await sender.Send(createRefreshTokenCommand);
-
-            var roles = await userManager.GetRolesAsync(foundUser);
-
-            var claims = roles
-                .Select(roleStr => new Claim(ClaimTypes.Role, roleStr))
-                .Append(new Claim(ClaimTypes.NameIdentifier, foundUser.Id.ToString()))
-                .Append(new Claim(ClaimTypes.Email, foundUser.Email ?? "not set"))
-                .Append(new Claim(ClaimTypes.Name, foundUser.UserName ?? "not set"));
-
-            var signingKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes);
-            var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
-
-            var newToken = new JwtSecurityToken(
-                issuer: jwtOptions.Issuer,
-                audience: jwtOptions.Audience,
-                claims: claims,
-                expires: DateTime.Now.AddMinutes(jwtOptions.LifeTimeInMinutes),
-                signingCredentials: signingCredentials
-            );
-
-            var newTokenStr = handler.WriteToken(newToken);
-
-            return Ok(new {
-                refresh = createRefreshTokenCommand.Token,
-                access = newTokenStr,
-            });
-        }
-        catch(Exception ex)
-        {
-            return StatusCode(500, ex.Message);
-        }
-    }
-
-    [HttpPut]
-    [Authorize]
-    public async Task<IActionResult> LogOut([Required]Guid refresh) 
-    {
-        try
-        {
-            var tokenStr = base.HttpContext.Request.Headers.Authorization.FirstOrDefault();
-
-            if(tokenStr is null) {
-                return base.StatusCode(401);
-            }
-
-            if(tokenStr.StartsWith("Bearer ")) {
-                tokenStr = tokenStr.Substring("Bearer ".Length);
-            }
-
-            var handler = new JwtSecurityTokenHandler();
-            var tokenValidationResult = await handler.ValidateTokenAsync(
-                tokenStr,
-                new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidIssuer = jwtOptions.Issuer,
-
-                    ValidateAudience = true,
-                    ValidAudience = jwtOptions.Audience,
-
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(jwtOptions.KeyInBytes)
-                }
-            );
-
-            if(tokenValidationResult.IsValid == false) {
-                return BadRequest(tokenValidationResult.Exception);
-            }
-
-            var token = handler.ReadJwtToken(tokenStr);
-
-            Claim? idClaim = token.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.NameIdentifier);
-
-            if(idClaim is null) {
-                return BadRequest($"Token has no claim with type '{ClaimTypes.NameIdentifier}'");
-            }
-
-            int.TryParse(idClaim.Value, out int userId);
-            var userIdstr = idClaim.Value;
-
-            var foundUser = await userManager.FindByIdAsync(userIdstr);
-
-            if(foundUser is null) {
                 return BadRequest($"User not found by id: '{userId}'");
             }
 
@@ -440,7 +417,7 @@ public class IdentityController : Controller
 
             return Ok();
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             return StatusCode(500, ex.Message);
         }
